@@ -36,11 +36,11 @@ export default defineConfig(({ mode }) => {
       VitePWA({
         registerType: "autoUpdate",
         manifest: {
-          name: "Template PWA",
-          short_name: "TemplatePWA",
-          description: "Small starter app for school projects.",
-          theme_color: "#0e1a2b",
-          background_color: "#eff6ff",
+          name: "Year Planner",
+          short_name: "Year",
+          description: "Shared year planner calendar.",
+          theme_color: "#fafafa",
+          background_color: "#fafafa",
           display: "standalone",
           start_url: "/",
           icons: [
@@ -78,6 +78,11 @@ export default defineConfig(({ mode }) => {
     test: {
       globals: true,
       environment: "jsdom",
+      environmentOptions: {
+        jsdom: {
+          url: "http://127.0.0.1:5101/",
+        },
+      },
       setupFiles: "./vitest.setup.ts",
       exclude: ["tests/e2e/**", "node_modules/**", "dist/**"],
     },

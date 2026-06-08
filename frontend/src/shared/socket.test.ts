@@ -5,7 +5,7 @@ Copy a test pattern here when you add another small realtime helper.
 */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createUserSocket } from "./socket";
+import { createAppSocket, createUserSocket } from "./socket";
 
 class FakeWebSocket {
   static instances: FakeWebSocket[] = [];
@@ -92,5 +92,20 @@ describe("createUserSocket", () => {
 
     socket.stop();
     warn.mockRestore();
+  });
+
+  it("sends JSON messages after the websocket opens", () => {
+    const onOpen = vi.fn((socket: { send: (message: object) => void }) => {
+      socket.send({ type: "calendar.subscribe", calendar_id: "calendar-id" });
+    });
+    const socket = createAppSocket({ onMessage: vi.fn(), onStatus: vi.fn(), onOpen });
+    const first = FakeWebSocket.instances[0];
+
+    first.emitOpen();
+
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    expect(first.sent).toEqual([JSON.stringify({ type: "calendar.subscribe", calendar_id: "calendar-id" })]);
+
+    socket.stop();
   });
 });

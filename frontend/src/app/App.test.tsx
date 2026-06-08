@@ -1,60 +1,72 @@
 /*
-This file tests the main app router and route guards.
-Edit this file when top-level routes or auth redirects change.
-Copy a test pattern here when you add another route or route guard.
+This file tests the main calendar routes and root startup redirect.
+Edit this file when top-level calendar routes change.
+Copy a test pattern here when you add another route or redirect.
 */
 
 import "@testing-library/jest-dom/vitest";
-import { describe, expect, it, vi } from "vitest";
-
-vi.mock("../pages/DashboardPage", () => ({
-  DashboardPage: () => <h2>Dashboard</h2>,
-}));
-
-vi.mock("../pages/AdminPage", () => ({
-  AdminPage: () => <h2>Admin page</h2>,
-}));
-
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
-import { AuthContext } from "./auth";
-import type { User } from "../shared/types";
 
-const userValue: User = {
-  id: 2,
-  username: "user",
-  is_admin: false,
-  created_at: "2026-03-06T10:00:00+00:00",
-  updated_at: "2026-03-06T10:00:00+00:00",
-};
+const { createCalendar } = vi.hoisted(() => ({
+  createCalendar: vi.fn(),
+}));
 
-function renderApp(path: string, user: User | null) {
-  return render(
-    <MemoryRouter initialEntries={[path]}>
-      <AuthContext.Provider
-        value={{
-          user,
-          loading: false,
-          login: vi.fn(),
-          logout: vi.fn(),
-          reloadUser: vi.fn(),
-        }}
-      >
-        <App />
-      </AuthContext.Provider>
-    </MemoryRouter>,
-  );
-}
+vi.mock("../features/calendar/api", () => ({
+  createCalendar,
+}));
 
-describe("App routes", () => {
-  it("redirects anonymous users to login", () => {
-    renderApp("/dashboard", null);
-    expect(screen.getByRole("heading", { name: "Login" })).toBeInTheDocument();
+vi.mock("../pages/CalendarPage", () => ({
+  CalendarPage: ({ editable }: { editable: boolean }) => <h1>{editable ? "Edit calendar" : "View calendar"}</h1>,
+}));
+
+describe("App calendar routes", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    createCalendar.mockReset();
   });
 
-  it("redirects normal users away from admin page", () => {
-    renderApp("/admin", userValue);
-    expect(screen.getByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
+  it("opens a remembered edit calendar from the root route", async () => {
+    window.localStorage.setItem("year_last_calendar", JSON.stringify({ calendarId: "cal-1", editKey: "edit-1" }));
+
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole("heading", { name: "Edit calendar" })).toBeInTheDocument();
+    expect(createCalendar).not.toHaveBeenCalled();
+  });
+
+  it("creates a first calendar when nothing is remembered", async () => {
+    createCalendar.mockResolvedValue({
+      calendar_id: "cal-2",
+      edit_key: "edit-2",
+      calendar: { id: "cal-2", revision: 1, created_at: "", updated_at: "", snapshot: {} },
+      view_url: "http://127.0.0.1:5101/calendar/cal-2",
+      edit_url: "http://127.0.0.1:5101/calendar/cal-2/edit/edit-2",
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole("heading", { name: "Edit calendar" })).toBeInTheDocument();
+    expect(createCalendar).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders view-only calendar links", () => {
+    render(
+      <MemoryRouter initialEntries={["/calendar/cal-3"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("heading", { name: "View calendar" })).toBeInTheDocument();
   });
 });

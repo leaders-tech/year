@@ -12,13 +12,20 @@ export type SocketStatus = "idle" | "connecting" | "connected" | "disconnected";
 type CreateSocketOptions = {
   onMessage: (message: WsMessage) => void;
   onStatus: (status: SocketStatus) => void;
+  onOpen?: (socket: { send: (message: object) => void }) => void;
 };
 
-export function createUserSocket(options: CreateSocketOptions) {
+export function createAppSocket(options: CreateSocketOptions) {
   let ws: WebSocket | null = null;
   let stopped = false;
   let reconnectTimer: number | null = null;
   let reconnectDelayMs = 1500;
+
+  const api = {
+    send(message: object) {
+      ws?.send(JSON.stringify(message));
+    },
+  };
 
   const connect = () => {
     options.onStatus("connecting");
@@ -26,6 +33,7 @@ export function createUserSocket(options: CreateSocketOptions) {
     ws.onopen = () => {
       reconnectDelayMs = 1500;
       options.onStatus("connected");
+      options.onOpen?.(api);
     };
     ws.onmessage = (event) => options.onMessage(JSON.parse(event.data) as WsMessage);
     ws.onerror = () => console.warn("WebSocket error.");
@@ -41,8 +49,11 @@ export function createUserSocket(options: CreateSocketOptions) {
   connect();
 
   return {
+    send(message: object) {
+      api.send(message);
+    },
     sendPing() {
-      ws?.send(JSON.stringify({ type: "ping" }));
+      api.send({ type: "ping" });
     },
     stop() {
       stopped = true;
@@ -52,4 +63,8 @@ export function createUserSocket(options: CreateSocketOptions) {
       ws?.close();
     },
   };
+}
+
+export function createUserSocket(options: CreateSocketOptions) {
+  return createAppSocket(options);
 }

@@ -36,6 +36,16 @@ export type ApiFail = {
 export type ApiResponse<T> = ApiOk<T> | ApiFail;
 
 export type WsMessage =
-  | { type: "ws.ready"; user_id: number; connections: number }
+  | { type: "ws.ready"; user_id: number | null; connections: number }
   | { type: "pong" }
-  | { type: "notes.changed"; note?: Note; note_id?: number };
+  | { type: "error"; code: string; message: string }
+  | { type: "notes.changed"; note?: Note; note_id?: number }
+  | { type: "calendar.subscribed"; calendar_id: string; connections: number }
+  | {
+      type: "calendar.patched";
+      calendar_id: string;
+      revision: number;
+      snapshot: unknown;
+      operations: unknown[];
+      client_id?: string;
+    };

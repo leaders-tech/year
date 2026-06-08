@@ -1,4 +1,4 @@
-"""Test websocket auth rules and websocket error handling.
+"""Test websocket origin rules, anonymous readiness, and websocket error handling.
 
 Edit this file when websocket auth, message parsing, or websocket replies change.
 Copy a test pattern here when you add tests for another realtime feature.
@@ -7,17 +7,17 @@ Copy a test pattern here when you add tests for another realtime feature.
 from __future__ import annotations
 
 import pytest
-from aiohttp import WSServerHandshakeError
-from aiohttp import WSMsgType
+from aiohttp import WSServerHandshakeError, WSMsgType
 
 from backend.tests.conftest import login
 
 
 @pytest.mark.asyncio
-async def test_websocket_requires_login(client) -> None:
-    with pytest.raises(WSServerHandshakeError) as error:
-        await client.ws_connect("/ws")
-    assert error.value.status == 401
+async def test_websocket_allows_anonymous_connections(client) -> None:
+    ws = await client.ws_connect("/ws")
+    ready_message = await ws.receive_json()
+    assert ready_message == {"type": "ws.ready", "user_id": None, "connections": 0}
+    await ws.close()
 
 
 @pytest.mark.asyncio
