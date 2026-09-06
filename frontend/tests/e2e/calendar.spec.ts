@@ -1,6 +1,6 @@
 /*
-This file checks the main browser calendar flows: create, edit, view-only, and websocket sync.
-Edit this file when real calendar browser behavior changes across pages, URLs, or WebSockets.
+This file checks the app shell and main browser calendar flows: create, edit, view-only, and websocket sync.
+Edit this file when browser metadata or calendar behavior changes across pages, URLs, or WebSockets.
 Copy a test pattern here when you add another end-to-end calendar flow.
 */
 
@@ -15,6 +15,14 @@ async function openNewCalendar(page: Page) {
 test("root creates and remembers an editable calendar", async ({ page }) => {
   await openNewCalendar(page);
   const editUrl = page.url();
+
+  await expect(page).toHaveTitle("TLF Year");
+  await expect(page.locator('link[rel="icon"]')).toHaveAttribute("href", "/favicon.svg");
+
+  const faviconResponse = await page.request.get("/favicon.svg");
+  expect(faviconResponse.ok()).toBe(true);
+  expect(faviconResponse.headers()["content-type"]).toContain("image/svg+xml");
+  expect(await faviconResponse.text()).toContain('viewBox="0 0 64 64"');
 
   await page.goto("/");
 
