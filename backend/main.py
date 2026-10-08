@@ -13,6 +13,7 @@ from backend.config import Settings, load_settings, validate_settings
 from backend.db.connection import open_db
 from backend.db.migrations import run_migrations
 from backend.db.seed import seed_dev_data
+from backend.http.calendar_api import setup_calendar_api_routes
 from backend.http.middleware import cors_middleware, error_middleware
 from backend.http.routes import setup_api_routes
 from backend.ws.hub import WebSocketHub
@@ -41,6 +42,7 @@ def create_app(settings: Settings | None = None) -> web.Application:
 
     setup_auth_routes(app)
     setup_api_routes(app)
+    setup_calendar_api_routes(app)
     setup_ws_routes(app)
 
     app.on_startup.append(on_startup)

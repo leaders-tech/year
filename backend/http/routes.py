@@ -12,7 +12,8 @@ from aiohttp import web
 
 from backend.auth.access import require_admin, require_user
 from backend.config import Settings
-from backend.db.calendars import apply_calendar_patch, calendar_can_edit, create_calendar, get_calendar
+from backend.db.calendar_patches import apply_calendar_patch
+from backend.db.calendars import calendar_can_edit, create_calendar, get_calendar
 from backend.db.notes import delete_note, list_notes, save_note
 from backend.db.users import list_users
 from backend.http.json_api import AppError, ok, read_json
@@ -51,8 +52,16 @@ def _read_calendar_id(payload: dict[str, object]) -> str:
 async def calendars_create(request: web.Request) -> web.Response:
     require_allowed_origin(request)
     payload = await read_json(request)
-    name = str(payload.get("name") or "My year").strip()[:120] or "My year"
-    year = datetime.now(tz=UTC).year
+    unknown = payload.keys() - {"name", "year"}
+    if unknown:
+        raise AppError(400, "bad_request", f"Unknown fields: {', '.join(sorted(unknown))}.")
+    name = payload.get("name", "My year")
+    if not isinstance(name, str) or not name.strip() or len(name.strip()) > 120:
+        raise AppError(400, "bad_request", "Name must contain 1 to 120 characters.")
+    name = name.strip()
+    year = payload.get("year", datetime.now(tz=UTC).year)
+    if type(year) is not int or not 1 <= year <= 9999:
+        raise AppError(400, "bad_request", "Year must be an integer from 1 to 9999.")
     created = await create_calendar(request.app["db"], year, name)
     urls = _calendar_urls(request, created.calendar_id, created.edit_key)
     return ok(
@@ -95,12 +104,15 @@ async def calendars_patch(request: web.Request) -> web.Response:
         raise AppError(400, "bad_request", "Patch operations are required.")
 
     try:
-        calendar = await apply_calendar_patch(request.app["db"], calendar_id, raw_edit_key, operations)
+        settings: Settings = request.app["settings"]
+        result = await apply_calendar_patch(settings.db_path, calendar_id, raw_edit_key, operations)
     except ValueError as error:
         raise AppError(400, "bad_request", str(error)) from error
 
-    if calendar is None:
+    if result is None:
         raise AppError(403, "not_allowed", "Edit access is required.")
+
+    calendar, operations = result
 
     message = {
         "type": "calendar.patched",

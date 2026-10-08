@@ -286,16 +286,10 @@ async def _replace_calendar(db: aiosqlite.Connection, calendar_id: str, snapshot
         await _set_cell(db, calendar_id, _normalize_date_key(raw_date_key), _normalize_cell(raw_cell), now)
 
 
-async def apply_calendar_patch(db: aiosqlite.Connection, calendar_id: str, edit_key: str | None, operations: list[Any]) -> dict[str, Any] | None:
-    row = await _get_calendar_row(db, calendar_id)
-    if row is None or not verify_edit_key(row, edit_key):
-        return None
-    if not operations:
-        return await get_calendar(db, calendar_id)
-
+async def apply_calendar_operations(db: aiosqlite.Connection, calendar_id: str, operations: list[Any]) -> None:
+    """Apply validated operations inside the caller's calendar write transaction."""
     now = utc_now_text()
-    await db.execute("BEGIN")
-    try:
+    if operations:
         for operation in operations:
             if not isinstance(operation, dict):
                 raise ValueError("Patch operation must be an object.")
@@ -351,9 +345,3 @@ async def apply_calendar_patch(db: aiosqlite.Connection, calendar_id: str, edit_
             "UPDATE calendars SET revision = revision + 1, updated_at = ? WHERE id = ?",
             (now, calendar_id),
         )
-        await db.commit()
-    except Exception:
-        await db.rollback()
-        raise
-
-    return await get_calendar(db, calendar_id)

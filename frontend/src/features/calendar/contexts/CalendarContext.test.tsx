@@ -104,7 +104,9 @@ describe("CalendarProvider", () => {
   });
 
   it("applies websocket patches from other tabs", async () => {
-    let onMessage: ((message: { type: string; calendar_id: string; revision: number; snapshot: CalendarSnapshot; operations: unknown[]; client_id?: string }) => void) | null = null;
+    let onMessage:
+      | ((message: { type: string; calendar_id: string; revision: number; snapshot: CalendarSnapshot; operations: unknown[]; client_id?: string }) => void)
+      | null = null;
     createAppSocket.mockImplementation((options) => {
       onMessage = options.onMessage;
       return { stop: vi.fn(), send: vi.fn(), sendPing: vi.fn() };
@@ -151,6 +153,36 @@ describe("CalendarProvider", () => {
     expect(screen.getByText("Column")).toBeInTheDocument();
     expect(window.localStorage.getItem("year_calendar_view:calendar-id")).toBe("Column");
     expect(new URL(window.location.href).searchParams.get("view")).toBe("Column");
+    expect(patchCalendar).not.toHaveBeenCalled();
+  });
+
+  it("shows external API day updates in a view-only calendar without changing its view", async () => {
+    window.history.replaceState({}, "", "/calendar/calendar-id?view=Classic");
+    let onMessage: ((message: unknown) => void) | null = null;
+    createAppSocket.mockImplementation((options) => {
+      onMessage = options.onMessage;
+      return { stop: vi.fn(), send: vi.fn(), sendPing: vi.fn() };
+    });
+    mockLoad(false);
+    render(
+      <ProviderHarness editKey={null}>
+        <Calendar />
+      </ProviderHarness>,
+    );
+    expect(await screen.findByText("School year")).toBeInTheDocument();
+    act(() => {
+      onMessage?.({
+        type: "calendar.patched",
+        calendar_id: "calendar-id",
+        revision: 2,
+        snapshot: { ...baseSnapshot, name: "API year", dateCells: { "2026-9-8": { customText: "API exam", color: "blue" } } },
+        operations: [{ type: "set_cell", date_key: "2026-9-8", cell: { customText: "API exam", color: "blue" } }],
+      });
+    });
+    expect(screen.getByText("API year")).toBeInTheDocument();
+    expect(screen.getByText("API exam").closest(".day")).toHaveAttribute("data-colored", "true");
+    expect(new URL(window.location.href).searchParams.get("view")).toBe("Classic");
+    expect(screen.queryByRole("button", { name: "Copy edit link" })).not.toBeInTheDocument();
     expect(patchCalendar).not.toHaveBeenCalled();
   });
 });
